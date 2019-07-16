@@ -5,13 +5,27 @@
 #include "pnetcdf.h"
 #include "Array.h"
 
+// The versions are described by B??? / S???
+// where the question marks (there can be many) list the living neighbor states (0-8)
+// for which a cell is [B]orn (if dead) or [S]urvives (if alive)
+// See https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life#Variations
+int const VERSION_ORIG       = 1;  // B3 /S23
+int const VERSION_HIGHLIFE   = 2;  // B36/S23
+int const VERSION_SIERPINSKI = 3;  // B1 /S12 (only use with INIT_MIDDLE)
+
+// Initialization options
+int const INIT_RANDOM = 1;  // Random uniform initialization with "sparsity" proportion of the cells alive
+int const INIT_LINE   = 2;  // Initialize a horizontal line as alive 3/4 of the x-domain, one cell thick
+int const INIT_MIDDLE = 3;  // Initialize only the middle cell as alive
 
 // User editable parameters
-int    const nxglob   = 500;    // Global number of cells in the x-direction
-int    const nyglob   = 500;    // Global number of cells in the y-direction
-double const sparsity = 0.2;     // Initial sparsity of living cells
-int    const nsteps   = 10000;   // How many steps to run
-int    const outFreq  = 10;      // How frequently to dump output to file in terms of steps
+int    const nxglob   = 200;    // Global number of cells in the x-direction
+int    const nyglob   = 200;    // Global number of cells in the y-direction
+double const sparsity = 0.5;    // Initial sparsity of living cells
+int    const nsteps   = 1000;   // How many steps to run
+int    const outFreq  = 1;      // How frequently to dump output to file in terms of steps
+int    const version  = VERSION_ORIG;
+int    const initOpt  = INIT_LINE;
 
 
 // Other simulation parameters
@@ -115,10 +129,30 @@ void initialize() {
   grid.setup(ny+2,nx+2);
   next.setup(ny+2,nx+2);
 
-  // Randomly initialize this MPI rank's domain using the sparsity parameter
-  for (int j=0; j<ny; j++) {
+  if (initOpt == INIT_RANDOM) {
+    // Randomly initialize this MPI rank's domain using the sparsity parameter
+    for (int j=0; j<ny; j++) {
+      for (int i=0; i<nx; i++) {
+        grid(hs+j,hs+i) = random_uniform(sparsity);
+      }
+    }
+  } else if (initOpt == INIT_LINE) {
+    // Initialize a single-cell thick horizontal line 75% of the x-direction and centered
+    grid = 0;
     for (int i=0; i<nx; i++) {
-      grid(hs+j,hs+i) = random_uniform(sparsity);
+      int iGlob = i + i_beg;
+      if (iGlob >= nxglob / 8 && iGlob <= 7*nxglob / 8) {
+        grid(hs+nyglob/2,hs+i) = 1;
+      }
+    }
+  } else if (initOpt == INIT_MIDDLE) {
+    // Initialize a single-cell thick horizontal line 75% of the x-direction and centered
+    grid = 0;
+    for (int i=0; i<nx; i++) {
+      int iGlob = i + i_beg;
+      if (iGlob == nxglob / 2) {
+        grid(hs+nyglob/2,hs+i) = 1;
+      }
     }
   }
 
@@ -188,21 +222,59 @@ void advance() {
       // Take out my cell's contribution
       if (grid(hs+j,hs+i)) { numLivingNeighbors--; }
 
-      if (grid(hs+j,hs+i)) {
-        // My cell is currently alive
-        if (numLivingNeighbors < 2) {
-          next(hs+j,hs+i) = 0;    // Die by underpopulation
-        } else if (numLivingNeighbors == 2 || numLivingNeighbors == 3) {
-          next(hs+j,hs+i) = 1;    // Continue living in sustainable population
+      if (version == VERSION_ORIG) {
+        if (grid(hs+j,hs+i)) {
+          // My cell is currently alive
+          if (numLivingNeighbors < 2) {
+            next(hs+j,hs+i) = 0;    // Die by underpopulation
+          } else if (numLivingNeighbors == 2 || numLivingNeighbors == 3) {
+            next(hs+j,hs+i) = 1;    // Continue living in sustainable population
+          } else {
+            next(hs+j,hs+i) = 0;    // Die by overpopulation
+          }
         } else {
-          next(hs+j,hs+i) = 0;    // Die by overpopulation
+          // My cell is currently dead
+          if (numLivingNeighbors == 3) {
+            next(hs+j,hs+i) = 1;    // Alive by reproduction from neighbors
+          } else {
+            next(hs+j,hs+i) = 0;    // Continue to be dead
+          }
         }
-      } else {
-        // My cell is currently dead
-        if (numLivingNeighbors == 3) {
-          next(hs+j,hs+i) = 1;    // Alive by reproduction from neighbors
+      } else if (version == VERSION_HIGHLIFE) {
+        if (grid(hs+j,hs+i)) {
+          // My cell is currently alive
+          if (numLivingNeighbors < 2) {
+            next(hs+j,hs+i) = 0;    // Die by underpopulation
+          } else if (numLivingNeighbors == 2 || numLivingNeighbors == 3) {
+            next(hs+j,hs+i) = 1;    // Continue living in sustainable population
+          } else {
+            next(hs+j,hs+i) = 0;    // Die by overpopulation
+          }
         } else {
-          next(hs+j,hs+i) = 0;    // Continue to be dead
+          // My cell is currently dead
+          if (numLivingNeighbors == 3 || numLivingNeighbors == 6) {
+            next(hs+j,hs+i) = 1;    // Alive by reproduction from neighbors
+          } else {
+            next(hs+j,hs+i) = 0;    // Continue to be dead
+          }
+        }
+      } else if (version == VERSION_SIERPINSKI) {
+        if (grid(hs+j,hs+i)) {
+          // My cell is currently alive
+          if (numLivingNeighbors < 1) {
+            next(hs+j,hs+i) = 0;    // Die by underpopulation
+          } else if (numLivingNeighbors == 1 || numLivingNeighbors == 2) {
+            next(hs+j,hs+i) = 1;    // Continue living in sustainable population
+          } else {
+            next(hs+j,hs+i) = 0;    // Die by overpopulation
+          }
+        } else {
+          // My cell is currently dead
+          if (numLivingNeighbors == 1) {
+            next(hs+j,hs+i) = 1;    // Alive by reproduction from neighbors
+          } else {
+            next(hs+j,hs+i) = 0;    // Continue to be dead
+          }
         }
       }
       
