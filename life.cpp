@@ -43,6 +43,7 @@ void ncwrap(int ierr, int line);
 void output(int nstep);
 
 
+
 // Main Driver
 int main(int argc, char** argv) {
   int istep = 0;
@@ -57,7 +58,7 @@ int main(int argc, char** argv) {
 
     // If it's time to output, the do output
     if (istep%outFreq == 0) {
-      output(istep);
+      output(istep);           // output to a NetCDF file using parallel-netcdf
     }
   }
 
@@ -87,6 +88,7 @@ void initialize() {
 
   srand( time(NULL) | myrank );       // Set the initial random seed based on the time
 
+  // If my rank is 0, then make me the masterProc
   masterProc = 0;
   if (myrank == 0) {masterProc = 1;}
 
@@ -118,6 +120,7 @@ void initialize() {
     }
   }
 
+  // We need to keep track of how many outputs have been performed
   numOut = 0;
 }
 
@@ -251,6 +254,7 @@ void output(int const nstep) {
     ncwrap( ncmpi_inq_varid( ncid , "cells" , &gVar  ) , __LINE__ );
   }
 
+  // Put the data in a contiguous array so that it can be efficiently written to file
   for (int j=0; j<ny; j++) {
     for (int i=0; i<nx; i++) {
       outData(j,i) = grid(hs+j,hs+i);
@@ -260,11 +264,13 @@ void output(int const nstep) {
   ct[0] = 1     ; ct[1] = ny; ct[2] = nx   ;
   ncwrap( ncmpi_put_vara_int_all( ncid , gVar , st , ct , outData.get_data() ) , __LINE__ );
 
+  // Write the current step to file
   ncwrap( ncmpi_begin_indep_data(ncid) , __LINE__ );
   st[0] = numOut;
   ncwrap( ncmpi_put_var1_int( ncid , sVar , st , &nstep ) , __LINE__ );
   ncwrap( ncmpi_end_indep_data(ncid) , __LINE__ );
 
+  // Close the file
   ncwrap( ncmpi_close(ncid) , __LINE__ );
 
   numOut++;
