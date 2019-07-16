@@ -7,8 +7,8 @@
 
 
 // User editable parameters
-int    const nxglob   = 1000;    // Global number of cells in the x-direction
-int    const nyglob   = 1000;    // Global number of cells in the y-direction
+int    const nxglob   = 500;    // Global number of cells in the x-direction
+int    const nyglob   = 500;    // Global number of cells in the y-direction
 double const sparsity = 0.2;     // Initial sparsity of living cells
 int    const nsteps   = 10000;   // How many steps to run
 int    const outFreq  = 10;      // How frequently to dump output to file in terms of steps
@@ -86,7 +86,9 @@ void initialize() {
   MPI_Comm_size(MPI_COMM_WORLD,&nranks);  // Get the number of MPI Ranks
   MPI_Comm_rank(MPI_COMM_WORLD,&myrank);  // Get my MPI Rank ID
 
-  srand( time(NULL) | myrank );       // Set the initial random seed based on the time
+  std::cout << "My Rank: " << myrank << "\n";
+
+  srand( time(NULL) * myrank );       // Set the initial random seed based on the time
 
   // If my rank is 0, then make me the masterProc
   masterProc = 0;
