@@ -196,6 +196,7 @@ void advance() {
           next(hs+j,hs+i) = 0;    // Die by overpopulation
         }
       } else {
+        // My cell is currently dead
         if (numLivingNeighbors == 3) {
           next(hs+j,hs+i) = 1;    // Alive by reproduction from neighbors
         } else {
