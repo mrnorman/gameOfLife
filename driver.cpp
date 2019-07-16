@@ -10,23 +10,24 @@
 int    const nxglob   = 1000;    // Global number of cells in the x-direction
 int    const nyglob   = 1000;    // Global number of cells in the y-direction
 double const sparsity = 0.2;     // Initial sparsity of living cells
-int    const nsteps   = 100;     // How many steps to run
-int    const outFreq  = 1;       // How frequently to dump output to file in terms of steps
+int    const nsteps   = 10000;   // How many steps to run
+int    const outFreq  = 10;      // How frequently to dump output to file in terms of steps
 
 
 // Other simulation parameters
-Array<unsigned char> grid;  // This process's local board of automata plus a halo of 1 cell in each direction for convenience
-Array<unsigned char> next;  // Store the next step's data in a separate array so we don't overwrite the current grid while we're still computing the next step
-Array<int> outData;         // For dumping out the data
-int numOut;                 // Number of outputs so far
-int nx;                     // The local number of x cells
-int const ny = nyglob;      // The local number of y cells (I don't decompose in the y-dimension, so this is the global number)
-int nranks;                 // The number of MPI ranks
-int myrank;                 // My MPI Rank ID
-int left_rank;              // The MPI rank ID of my left  neighbor (periodic domain)
-int right_rank;             // The MPI rank ID of my right neighbor (periodic domain)
-int i_beg, i_end;           // begining and ending global cell indices in the x-direction for my MPI rank
-int const hs = 1;           // Halo size is always 1 cell
+Array<unsigned char> grid;      // This process's local board of automata plus a halo of 1 cell in each direction for convenience
+Array<unsigned char> next;      // Store the next step's data in a separate array so we don't overwrite the current grid while we're still computing the next step
+Array<int> outData;             // For dumping out the data
+int numOut;                     // Number of outputs so far
+int nx;                         // The local number of x cells
+int const ny = nyglob;          // The local number of y cells (I don't decompose in the y-dimension, so this is the global number)
+int nranks;                     // The number of MPI ranks
+int myrank;                     // My MPI Rank ID
+int masterProc;                 // Logical for whether I'm the master process (process 0)
+int left_rank;                  // The MPI rank ID of my left  neighbor (periodic domain)
+int right_rank;                 // The MPI rank ID of my right neighbor (periodic domain)
+int i_beg, i_end;               // begining and ending global cell indices in the x-direction for my MPI rank
+int const hs = 1;               // Halo size is always 1 cell
 unsigned char sendbuf_l[ny+2];  // buffer for sending   data to   my left  neighbor
 unsigned char sendbuf_r[ny+2];  // buffer for sending   data to   my right neighbor
 unsigned char recvbuf_l[ny+2];  // buffer for receiving data from my left  neighbor
@@ -80,10 +81,14 @@ unsigned char random_uniform(double const ratio) {
 
 // Initialize the MPI and the grid of living and dead cells
 void initialize() {
-  srand(time(NULL));       // Set the initial random seed based on the time
 
   MPI_Comm_size(MPI_COMM_WORLD,&nranks);  // Get the number of MPI Ranks
   MPI_Comm_rank(MPI_COMM_WORLD,&myrank);  // Get my MPI Rank ID
+
+  srand( time(NULL) | myrank );       // Set the initial random seed based on the time
+
+  masterProc = 0;
+  if (myrank == 0) {masterProc = 1;}
 
   // Determine my rank's beginning and ending index in the x-direction
   double nper = ( (double) nxglob ) / nranks;   // Get the number of cells per rank
@@ -215,6 +220,8 @@ void output(int const nstep) {
   MPI_Offset st[3], ct[3];
   int ncid, xDim, yDim, sDim, gVar, sVar;
 
+  if (masterProc) {std::cout << "Output step: " << nstep << "\n";}
+
   if (nstep == 0) {
     // Create the file
     ncwrap( ncmpi_create( MPI_COMM_WORLD , "output.nc" , NC_CLOBBER , MPI_INFO_NULL , &ncid ) , __LINE__ );
@@ -257,6 +264,8 @@ void output(int const nstep) {
   st[0] = numOut;
   ncwrap( ncmpi_put_var1_int( ncid , sVar , st , &nstep ) , __LINE__ );
   ncwrap( ncmpi_end_indep_data(ncid) , __LINE__ );
+
+  ncwrap( ncmpi_close(ncid) , __LINE__ );
 
   numOut++;
 }
