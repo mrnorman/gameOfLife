@@ -24,3 +24,8 @@ I made the choice of using so-called "halo" cells to make neighbor calculations 
 ```
 
 where a `0` is a halo cell and a `*` is a domain cell for this MPI task.
+
+## MPI Decomposition
+
+I use a standard "domain decomposition" strategy by divying up the global physical domain into contiguous chunks and assigning one chunk per MPI task. In my case, I simplified things by only decomposing the domain in the `x`-direction and not the `y`-direction. This means I have a left-hand neighbor and a right-hand neighbor, and it greatly simplifies the data movement. I send two messages to my left and right neighboring MPI tasks, and I receive two messages from my left and right neighboring MPI tasks. In a truly 2-D decomposition, I now have 8 neighbors, and things get more complicated. I choose to use MPI_Isend, MPI_Irecv, and MPI_WaitAll to coordinate the MPI messages. See the code for implementation specifics.
+
