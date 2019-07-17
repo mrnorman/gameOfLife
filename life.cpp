@@ -19,13 +19,13 @@ int const INIT_LINE   = 2;  // Initialize a horizontal line as alive 3/4 of the 
 int const INIT_MIDDLE = 3;  // Initialize only the middle cell as alive
 
 // User editable parameters
-int    const nxglob   = 200;    // Global number of cells in the x-direction
-int    const nyglob   = 200;    // Global number of cells in the y-direction
-double const sparsity = 0.5;    // Initial sparsity of living cells
-int    const nsteps   = 1000;   // How many steps to run
-int    const outFreq  = 1;      // How frequently to dump output to file in terms of steps
+int    const nxglob   = 400;    // Global number of cells in the x-direction
+int    const nyglob   = 400;    // Global number of cells in the y-direction
+double const sparsity = 0.3;    // Initial sparsity of living cells
+int    const nsteps   = 1000;  // How many steps to run
+int    const outFreq  = 10;    // How frequently to dump output to file in terms of steps
 int    const version  = VERSION_ORIG;
-int    const initOpt  = INIT_LINE;
+int    const initOpt  = INIT_RANDOM;
 
 
 // Other simulation parameters
@@ -47,6 +47,12 @@ unsigned char sendbuf_r[ny+2];  // buffer for sending   data to   my right neigh
 unsigned char recvbuf_l[ny+2];  // buffer for receiving data from my left  neighbor
 unsigned char recvbuf_r[ny+2];  // buffer for receiving data from my right neighbor
 
+double initTime = 0;
+double outTime = 0;
+double haloTime = 0;
+double advTime = 0;
+clock_t tmpTime;
+
 
 // Function definitions
 unsigned char random_uniform(double const ratio);
@@ -60,20 +66,40 @@ void output(int nstep);
 
 // Main Driver
 int main(int argc, char** argv) {
+  tmpTime = clock();
   int istep = 0;
   MPI_Init( &argc , &argv );   // Initialize MPI
   initialize();                // Initialize the model
+  initTime = (double) (clock() - tmpTime) / (double) CLOCKS_PER_SEC;
+
+  tmpTime = clock();
   output(0);                   // Output the initial state, and create the file
+  outTime += (double) (clock() - tmpTime) / (double) CLOCKS_PER_SEC;
 
   while (istep < nsteps) {
+    tmpTime = clock();
     exchangeHalos();           // Exchange halos with my left and right neighboring MPI tasks
+    haloTime += (double) (clock() - tmpTime) / (double) CLOCKS_PER_SEC;
+
+    tmpTime = clock();
     advance();                 // Advance one step based on the Game of Life rules
+    advTime += (double) (clock() - tmpTime) / (double) CLOCKS_PER_SEC;
+
     istep++;
 
     // If it's time to output, the do output
     if (istep%outFreq == 0) {
+      tmpTime = clock();
       output(istep);           // output to a NetCDF file using parallel-netcdf
+      outTime += (double) (clock() - tmpTime) / (double) CLOCKS_PER_SEC;
     }
+  }
+
+  if (masterProc) {
+    std::cout << "Init time (s)       : " << initTime << "\n";
+    std::cout << "File Output time (s): " << outTime  << "\n";
+    std::cout << "Halo time (s)       : " << haloTime << "\n";
+    std::cout << "Advance time (s)    : " << advTime  << "\n";
   }
 
   MPI_Finalize();              // Finalize the MPI
@@ -298,7 +324,7 @@ void output(int const nstep) {
   MPI_Offset st[3], ct[3];
   int ncid, xDim, yDim, sDim, gVar, sVar;
 
-  if (masterProc) {std::cout << "Output step: " << nstep << "\n";}
+  // if (masterProc) {std::cout << "Output step: " << nstep << "\n";}
 
   if (nstep == 0) {
     // Create the file
