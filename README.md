@@ -10,7 +10,9 @@ This will run the code in parallel. To easily view the results, you can use the 
 
 ## Data Structure Indexing
 
-I made the choice of using so-called "halo" cells to make neighbor calculations easier. Different MPI tasks will send their edge data to their neighbors to fill the neighboring halo cells. Halo cells are also used to implement the periodic boundary conditions. I have the left / bottom halo cell as index 0 in each dimension. Then the current MPI task's domain is in the indices `1,...,nx` and `1,...,ny`. Finally, the right / top halo cell is at index `nx+1` and `ny+1`. The left halo belongs to the left neighbor's right-most cell. The right halo belongs to the right neighbor's left-most cell. The same goes for the bottom and top. In 2-D, the grid looks like:
+I made the choice of using so-called "halo" cells to make neighbor calculations easier. It simplifies things because you isolate the MPI concerns to filling in the halo values with the appropriate values from neighboring MPI tasks' data. Then, once you fill in the halo cells, each cell only needs to check its eight neighbors, which are already in place thanks to the halos.
+
+Different MPI tasks will send their edge data to their neighbors to fill the neighboring halo cells. Halo cells are also used to implement the periodic boundary conditions. I have the left / bottom halo cell as index 0 in each dimension. Then the current MPI task's domain is in the indices `1,...,nx` and `1,...,ny`. Finally, the right / top halo cell is at index `nx+1` and `ny+1`. The left halo belongs to the left neighbor's right-most cell. The right halo belongs to the right neighbor's left-most cell. The same goes for the bottom and top. In 2-D, the grid looks like:
 
 ```
 0000000000
