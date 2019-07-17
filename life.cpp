@@ -96,10 +96,11 @@ int main(int argc, char** argv) {
   }
 
   if (masterProc) {
-    std::cout << "Init time (s)       : " << initTime << "\n";
-    std::cout << "File Output time (s): " << outTime  << "\n";
-    std::cout << "Halo time (s)       : " << haloTime << "\n";
-    std::cout << "Advance time (s)    : " << advTime  << "\n";
+    std::cout << "Total time (s)        : " << initTime+outTime+haloTime+advTime  << "\n";
+    std::cout << "  Init time (s)       : " << initTime << "\n";
+    std::cout << "  File Output time (s): " << outTime  << "\n";
+    std::cout << "  Halo time (s)       : " << haloTime << "\n";
+    std::cout << "  Advance time (s)    : " << advTime  << "\n";
   }
 
   MPI_Finalize();              // Finalize the MPI
