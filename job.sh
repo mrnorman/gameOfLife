@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH -C haswell
 #SBATCH --account=m1266
-#SBATCH --reservation=csgfhpc_wed
+#SBATCH --reservation=csgfhpc_thu
 
 srun -n 32 ./gameOfLife
 
