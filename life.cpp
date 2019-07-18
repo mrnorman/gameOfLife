@@ -19,8 +19,8 @@ int const INIT_LINE   = 2;  // Initialize a horizontal line as alive 3/4 of the 
 int const INIT_MIDDLE = 3;  // Initialize only the middle cell as alive
 
 // User editable parameters
-int    const nxglob   = 200;    // Global number of cells in the x-direction
-int    const nyglob   = 200;    // Global number of cells in the y-direction
+int    const nxglob   = 1000;   // Global number of cells in the x-direction
+int    const nyglob   = 1000;   // Global number of cells in the y-direction
 double const sparsity = 0.5;    // Initial sparsity of living cells
 int    const nsteps   = 1000;   // How many steps to run
 int    const outFreq  = 1;      // How frequently to dump output to file in terms of steps
@@ -47,6 +47,11 @@ unsigned char sendbuf_r[ny+2];  // buffer for sending   data to   my right neigh
 unsigned char recvbuf_l[ny+2];  // buffer for receiving data from my left  neighbor
 unsigned char recvbuf_r[ny+2];  // buffer for receiving data from my right neighbor
 
+double initTime;
+double haloTime;
+double advTime;
+double outTime;
+
 
 // Function definitions
 unsigned char random_uniform(double const ratio);
@@ -60,9 +65,11 @@ void output(int nstep);
 
 // Main Driver
 int main(int argc, char** argv) {
+  clock_t tmpTime = clock();
   int istep = 0;
   MPI_Init( &argc , &argv );   // Initialize MPI
   initialize();                // Initialize the model
+  initTime =  (double) (clock() - tmpTime)*1000 / (double) CLOCKS_PER_SEC;
   output(0);                   // Output the initial state, and create the file
 
   while (istep < nsteps) {
